@@ -193,7 +193,7 @@ static void get_chain_data(proxy_data * pd, unsigned int *proxy_count, chain_typ
 				pd[count].ps = PLAY_STATE;
 				port_n = 0;
 
-				int ret = sscanf(buff, "%s %s %d %s %s", type, host, &port_n, pd[count].user, pd[count].pass);
+				int ret = sscanf(buff, "%s#%s#%d#%s#%s", type, host, &port_n, pd[count].user, pd[count].pass);
 				if(ret < 3 || ret == EOF) {
 					inv:
 					fprintf(stderr, "error: invalid item in proxylist section: %s", buff);
