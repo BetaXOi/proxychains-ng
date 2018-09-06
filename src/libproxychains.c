@@ -153,6 +153,35 @@ static void gcc_init(void) {
 }
 #endif
 
+char *format_payload(char *payload, char *host, char *port) {
+	char *str, *token, *saveptr;
+	size_t size = strlen(payload) + 32;
+	char *buf = (char *)malloc(size);
+
+	memset(buf, 0x0, size);
+	for(str = payload; ; str = NULL) {
+		token = strtok_r(str, "[]", &saveptr);
+		if (token == NULL)
+			break;
+
+		if (!strcmp(token, "crlf")) {
+			strcat(buf, "\r\n");
+		} else if (!strcmp(token, "host")) {
+			strcat(buf, host);
+		} else if (!strcmp(token, "port")) {
+			strcat(buf, port);
+		} else if (!strcmp(token, "host_port")) {
+			strcat(buf, host);
+			strcat(buf, ":");
+			strcat(buf, port);
+		} else {
+			strcat(buf, token);
+		}
+	}
+
+	return buf;
+}
+
 /* get configuration from config file */
 static void get_chain_data(proxy_data * pd, unsigned int *proxy_count, chain_type * ct) {
 	int count = 0, port_n = 0, list = 0;
@@ -191,18 +220,33 @@ static void get_chain_data(proxy_data * pd, unsigned int *proxy_count, chain_typ
 				memset(&pd[count], 0, sizeof(proxy_data));
 
 				pd[count].ps = PLAY_STATE;
-				port_n = 0;
 
-				int ret = sscanf(buff, "%s#%s#%d#%s#%s", type, host, &port_n, pd[count].user, pd[count].pass);
-				if(ret < 3 || ret == EOF) {
+				char *str, *token[5], *payload = NULL, *port = NULL;
+				token[0] = type;
+				token[1] = host;
+				token[2] = port;
+				token[3] = pd[count].user;
+				token[4] = pd[count].pass;
+				int i;
+				for(i = 0, str = buff; i < 5; i++, str = NULL) {
+					token[i] = strtok_r(str, " ", &payload);
+					if (token[i] == NULL)
+						break;
+				}
+				if(port == NULL) {
 					inv:
 					fprintf(stderr, "error: invalid item in proxylist section: %s", buff);
 					exit(1);
 				}
+				if(!strcmp(pd[count].user, "-"))
+					pd[count].user[0] = '\0';
+				if(!strcmp(pd[count].pass, "-"))
+					pd[count].pass[0] = '\0';
+				pd[count].payload = format_payload(payload, host, port);
 
 				memset(&pd[count].ip, 0, sizeof(pd[count].ip));
 				pd[count].ip.is_v6 = !!strchr(host, ':');
-				pd[count].port = htons((unsigned short) port_n);
+				pd[count].port = htons((unsigned short) atoi(port));
 				ip_type* host_ip = &pd[count].ip;
 				if(1 != inet_pton(host_ip->is_v6 ? AF_INET6 : AF_INET, host, host_ip->addr.v6)) {
 					fprintf(stderr, "proxy %s has invalid value or is not numeric\n", host);

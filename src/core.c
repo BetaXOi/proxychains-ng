@@ -252,7 +252,7 @@ static int timed_connect(int sock, const struct sockaddr *addr, socklen_t len) {
 
 
 #define INVALID_INDEX 0xFFFFFFFFU
-static int tunnel_to(int sock, ip_type ip, unsigned short port, proxy_type pt, char *user, char *pass) {
+static int tunnel_to(int sock, ip_type ip, unsigned short port, proxy_type pt, char *user, char *pass, char *payload) {
 	char *dns_name = NULL;
 	char hostnamebuf[MSG_LEN_MAX];
 	size_t dns_len = 0;
@@ -302,12 +302,20 @@ static int tunnel_to(int sock, ip_type ip, unsigned short port, proxy_type pt, c
 			} else dst[0] = 0;
 
 			uint16_t hs_port = ntohs(port);
-			len = snprintf((char *) buff, sizeof(buff),
-			               "CONNECT %s:%d HTTP/1.0\r\nHost: %s:%d\r\n%s%s%s\r\n",
-			                dns_name, hs_port,
-			                dns_name, hs_port,
-			                ulen ? "Proxy-Authorization: Basic " : dst,
-			                dst, ulen ? "\r\n" : dst);
+			if(payload) {
+				len = snprintf((char *) buff, sizeof(buff),
+				               "%s\r\n%s%s%s\r\n",
+				               payload,
+			                       ulen ? "Proxy-Authorization: Basic " : dst,
+			                       dst, ulen ? "\r\n" : "");
+			} else {
+				len = snprintf((char *) buff, sizeof(buff),
+				               "CONNECT %s:%d HTTP/1.0\r\nHost: %s:%d\r\n%s%s%s\r\n",
+				                dns_name, hs_port,
+				                dns_name, hs_port,
+				                ulen ? "Proxy-Authorization: Basic " : dst,
+				                dst, ulen ? "\r\n" : "");
+			}
 
 			if(len < 0 || len != send(sock, buff, len, 0))
 				goto err;
@@ -600,7 +608,7 @@ static int chain_step(int ns, proxy_data * pfrom, proxy_data * pto) {
 	}
 
 	proxychains_write_log(TP " %s:%d ", hostname, htons(pto->port));
-	retcode = tunnel_to(ns, pto->ip, pto->port, pfrom->pt, pfrom->user, pfrom->pass);
+	retcode = tunnel_to(ns, pto->ip, pto->port, pfrom->pt, pfrom->user, pfrom->pass, pfrom->payload);
 	switch (retcode) {
 		case SUCCESS:
 			pto->ps = BUSY_STATE;

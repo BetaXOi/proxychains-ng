@@ -75,6 +75,7 @@ typedef struct {
 	proxy_state ps;
 	char user[256];
 	char pass[256];
+	char *payload;
 } proxy_data;
 
 int connect_proxy_chain (int sock, ip_type target_ip, unsigned short target_port,
